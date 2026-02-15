@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canasta Tracker - MU vs AS (lokal)</title>
+  <style>
+    :root { --bg:#0b1220; --card:#121a2b; --muted:#8aa0c5; --text:#e8eefc; --accent:#5eead4; --danger:#fb7185; --warn:#fbbf24; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#070b14,#0b1220 25%,#0b1220);color:var(--text)}
+    header{padding:18px 18px 10px;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;background:rgba(11,18,32,.9);backdrop-filter:saturate(160%) blur(10px);z-index:10}
+    h1{margin:0;font-size:18px;letter-spacing:.2px}
+    .sub{margin-top:4px;color:var(--muted);font-size:13px}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px}
+    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 0}
+    .tabbtn{border:1px solid rgba(255,255,255,.14);background:transparent;color:var(--text);padding:8px 12px;border-radius:999px;cursor:pointer;font-size:13px}
+    .tabbtn[aria-selected="true"]{background:rgba(94,234,212,.12);border-color:rgba(94,234,212,.45)}
+    .row{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:900px){.row.two{grid-template-columns:1fr 1fr}}
+    .card{background:rgba(18,26,43,.92);border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .card h2{margin:0 0 10px;font-size:15px}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    input,select,textarea{width:100%;padding:10px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:var(--text);outline:none}
+    textarea{min-height:84px;resize:vertical}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    button{border:none;border-radius:12px;padding:10px 12px;background:rgba(94,234,212,.14);color:var(--text);cursor:pointer}
+    button:hover{background:rgba(94,234,212,.22)}
+    button.secondary{background:rgba(255,255,255,.10)}
+    button.secondary:hover{background:rgba(255,255,255,.14)}
+    button.danger{background:rgba(251,113,133,.16)}
+    button.danger:hover{background:rgba(251,113,133,.22)}
+    .notice{padding:10px 12px;border-radius:12px;margin:10px 0;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);font-size:13px;color:var(--muted)}
+    .notice.warn{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:#ffe9b5}
+    .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    @media(min-width:900px){.kpis{grid-template-columns:repeat(4,1fr)}}
+    .kpi{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+    .kpi .v{font-size:20px;font-weight:700;margin-top:2px}
+    .kpi .l{font-size:12px;color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;text-align:left;vertical-align:top}
+    th{color:var(--muted);font-weight:600}
+    tr:hover td{background:rgba(255,255,255,.03)}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid rgba(255,255,255,.14);color:var(--muted)}
+    .pill.win{border-color:rgba(94,234,212,.45);color:#b7fff5}
+    .pill.lose{border-color:rgba(251,113,133,.45);color:#ffd0d8}
+    .right{display:flex;justify-content:flex-end;gap:8px}
+    .small{font-size:12px;color:var(--muted)}
+    canvas{width:100%;height:260px;border:1px solid rgba(255,255,255,.10);border-radius:14px;background:rgba(255,255,255,.03)}
+    .hidden{display:none !important}
+    .footer{margin-top:16px;color:var(--muted);font-size:12px}
+    code{background:rgba(255,255,255,.06);padding:1px 6px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap" style="padding:0 18px;">
+      <h1>Canasta Tracker - Team MU vs Team AS</h1>
+      <div class="sub">Offline-Tracker mit Dashboard, Tagesergebnis, Export/Import (JSON/CSV). Speicherung standardmäßig im Browser (<code>localStorage</code>).</div>
+      <div id="storageNotice" class="notice warn hidden"></div>
+      <div class="tabs" role="tablist" aria-label="Navigation">
+        <button class="tabbtn" role="tab" id="tab-entry" aria-controls="panel-entry" aria-selected="true">Neue Eingabe</button>
+        <button class="tabbtn" role="tab" id="tab-day" aria-controls="panel-day" aria-selected="false">Tagesergebnis</button>
+        <button class="tabbtn" role="tab" id="tab-dashboard" aria-controls="panel-dashboard" aria-selected="false">Dashboard</button>
+        <button class="tabbtn" role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false">Daten / Export</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="panel-entry" role="tabpanel" aria-labelledby="tab-entry">
+      <div class="row two">
+        <div class="card">
+          <h2>Spiel eintragen</h2>
+          <div class="notice">Pro Spiel eine Zeile. <span class="small">Tipp: Datum = Spieltag; Spiel-Nr kann automatisch hochgezählt werden.</span></div>
+
+          <label for="date">Datum</label>
+          <input id="date" type="date"/>
+
+          <label for="gameNo">Spiel-Nr (pro Datum)</label>
+          <input id="gameNo" type="number" min="1" step="1" placeholder="z.B. 1"/>
+
+          <div class="row two" style="gap:12px;">
+            <div>
+              <label for="mu">Punkte Team MU (Schwiegermutter + Frau)</label>
+              <input id="mu" type="number" step="1" placeholder="z.B. 1520"/>
+            </div>
+            <div>
+              <label for="as">Punkte Team AS (du + Schwiegervater)</label>
+              <input id="as" type="number" step="1" placeholder="z.B. 1750"/>
+            </div>
+          </div>
+
+          <label for="comment">Kommentar (optional)</label>
+          <textarea id="comment" placeholder="z.B. knapp verloren, tolles Finish, ..."></textarea>
+
+          <div class="actions">
+            <button id="btnSave">Speichern</button>
+            <button class="secondary" id="btnAutono">Spiel-Nr automatisch setzen</button>
+            <button class="danger" id="btnClear">Eingabe leeren</button>
+          </div>
+          <div class="footer">Hinweis: Wenn dein Browser <code>localStorage</code> bei lokalen Dateien blockiert, nutze Export/Import im Tab „Daten / Export“.</div>
+        </div>
+
+        <div class="card">
+          <h2>Letzte Spiele</h2>
+          <div class="right">
+            <button class="secondary" id="btnRefresh">Aktualisieren</button>
+          </div>
+          <div class="small" style="margin:6px 0 10px;">Klicke „Bearbeiten“, um Einträge zu ändern oder zu löschen.</div>
+          <div style="overflow:auto;">
+            <table id="recentTable" aria-label="Letzte Spiele Tabelle">
+              <thead>
+                <tr>
+                  <th>Datum</th><th>#</th><th>MU</th><th>AS</th><th>Sieger</th><th>Kommentar</th><th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-day" role="tabpanel" aria-labelledby="tab-day" class="hidden">
+      <div class="row two">
+        <div class="card">
+          <h2>Tagesergebnis</h2>
+          <label for="dayPick">Datum auswählen</label>
+          <input id="dayPick" type="date"/>
+
+          <div class="kpis" style="margin-top:12px;">
+            <div class="kpi"><div class="l">Spiele</div><div class="v" id="kDayGames">0</div></div>
+            <div class="kpi"><div class="l">Summe MU</div><div class="v" id="kDayMU">0</div></div>
+            <div class="kpi"><div class="l">Summe AS</div><div class="v" id="kDayAS">0</div></div>
+            <div class="kpi"><div class="l">Tagessieger</div><div class="v" id="kDayWinner">-</div></div>
+          </div>
+
+          <div class="notice" style="margin-top:12px;">
+            Tagessieger = höhere Punktsumme. Bei Gleichstand: Unentschieden.
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Spiele am ausgewählten Tag</h2>
+          <div style="overflow:auto;">
+            <table id="dayTable">
+              <thead><tr><th>#</th><th>MU</th><th>AS</th><th>Sieger</th><th>Kommentar</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" class="hidden">
+      <div class="row">
+        <div class="card">
+          <h2>KPIs gesamt</h2>
+          <div class="kpis">
+            <div class="kpi"><div class="l">Spiele total</div><div class="v" id="kTotalGames">0</div></div>
+            <div class="kpi"><div class="l">Siege MU</div><div class="v" id="kWinsMU">0</div></div>
+            <div class="kpi"><div class="l">Siege AS</div><div class="v" id="kWinsAS">0</div></div>
+            <div class="kpi"><div class="l">Unentschieden</div><div class="v" id="kDraws">0</div></div>
+          </div>
+          <div class="kpis" style="margin-top:10px;">
+            <div class="kpi"><div class="l">Ø Punkte MU</div><div class="v" id="kAvgMU">0</div></div>
+            <div class="kpi"><div class="l">Ø Punkte AS</div><div class="v" id="kAvgAS">0</div></div>
+            <div class="kpi"><div class="l">Punktedifferenz (AS - MU)</div><div class="v" id="kDiff">0</div></div>
+            <div class="kpi"><div class="l">Letztes Spiel</div><div class="v" id="kLast">-</div></div>
+          </div>
+        </div>
+
+        <div class="row two">
+          <div class="card">
+            <h2>Punkteverlauf (chronologisch)</h2>
+            <canvas id="chart"></canvas>
+            <div class="small" style="margin-top:8px;">Linien: MU und AS (ohne externe Bibliotheken).</div>
+          </div>
+          <div class="card">
+            <h2>Monatsübersicht</h2>
+            <div style="overflow:auto;">
+              <table id="monthTable">
+                <thead><tr><th>Monat</th><th>Spiele</th><th>Siege MU</th><th>Siege AS</th><th>Summe MU</th><th>Summe AS</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="panel-data" role="tabpanel" aria-labelledby="tab-data" class="hidden">
+      <div class="row two">
+        <div class="card">
+          <h2>Export</h2>
+          <div class="notice">Backup empfohlen, weil Browser-Speicher je nach Gerät/Browser getrennt ist.</div>
+          <div class="actions">
+            <button id="btnExportJSON">Export JSON</button>
+            <button id="btnExportCSV" class="secondary">Export CSV</button>
+          </div>
+          <label for="exportArea">Export-Inhalt</label>
+          <textarea id="exportArea" readonly placeholder="Hier erscheint der Export..."></textarea>
+        </div>
+
+        <div class="card">
+          <h2>Import / Verwaltung</h2>
+          <label for="importArea">JSON einfügen (Export-JSON)</label>
+          <textarea id="importArea" placeholder='{"games":[...]}'>{"games":[]}</textarea>
+          <div class="actions">
+            <button id="btnImport">Import JSON</button>
+            <button id="btnMerge" class="secondary">Import + zusammenführen (merge)</button>
+            <button id="btnReset" class="danger">ALLE Daten löschen</button>
+          </div>
+          <div class="notice warn" id="importMsg" style="display:none;"></div>
+          <div class="footer">Merge-Regel: identisch = gleiche Kombination aus <code>date</code> + <code>gameNo</code>. Neuere Eingabe überschreibt.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  const STORAGE_KEY = "canasta_mu_as_v1";
+  const state = { games: [], storageOk: true };
+
+  function canUseLocalStorage() {
+    try {
+      const t = "__test__" + Math.random();
+      localStorage.setItem(t, "1");
+      localStorage.removeItem(t);
+      return true;
+    } catch (e) { return false; }
+  }
+  function showStorageWarning(msg) {
+    const el = document.getElementById("storageNotice");
+    el.textContent = msg;
+    el.classList.remove("hidden");
+  }
+  function load() {
+    state.storageOk = canUseLocalStorage();
+    if (!state.storageOk) {
+      showStorageWarning("Achtung: Dein Browser blockiert localStorage (oft bei lokalen HTML-Dateien/Privacy-Settings). Daten bleiben nur für diese Sitzung erhalten. Nutze bitte Export/Import als Backup.");
+      state.games = [];
+      return;
+    }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state.games = raw ? (JSON.parse(raw).games || []) : [];
+  }
+  function persist() { if (state.storageOk) localStorage.setItem(STORAGE_KEY, JSON.stringify({ games: state.games })); }
+
+  function byDateGameNo(a,b){ if (a.date!==b.date) return a.date<b.date?-1:1; return (a.gameNo||0)-(b.gameNo||0); }
+  function isoToday(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+  function winner(mu,as){ mu=Number(mu); as=Number(as); if (mu>as) return "MU"; if (as>mu) return "AS"; return "-"; }
+  function fmt(n){ return (Number.isFinite(n) ? Math.round(n).toLocaleString('de-DE') : "0"); }
+  function keyOf(g){ return `${g.date}#${g.gameNo}`; }
+  function normalizeGame(g){ return { date:String(g.date||""), gameNo:Number(g.gameNo||0), mu:Number(g.mu||0), as:Number(g.as||0), comment:String(g.comment||"") }; }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  const tabs = [
+    { btn:"tab-entry", panel:"panel-entry", onShow: () => renderRecent() },
+    { btn:"tab-day", panel:"panel-day", onShow: () => renderDay() },
+    { btn:"tab-dashboard", panel:"panel-dashboard", onShow: () => renderDashboard() },
+    { btn:"tab-data", panel:"panel-data", onShow: () => {} },
+  ];
+  function showTab(btnId){
+    tabs.forEach(t=>{
+      const b=document.getElementById(t.btn), p=document.getElementById(t.panel);
+      const active = (t.btn===btnId);
+      b.setAttribute("aria-selected", active?"true":"false");
+      p.classList.toggle("hidden", !active);
+      if (active) t.onShow();
+    });
+  }
+  tabs.forEach(t=>document.getElementById(t.btn).addEventListener("click",()=>showTab(t.btn)));
+
+  // Entry
+  const elDate=document.getElementById("date");
+  const elGameNo=document.getElementById("gameNo");
+  const elMU=document.getElementById("mu");
+  const elAS=document.getElementById("as");
+  const elComment=document.getElementById("comment");
+
+  function nextGameNoForDate(date){
+    const max = state.games.filter(g=>g.date===date).reduce((m,g)=>Math.max(m, Number(g.gameNo||0)),0);
+    return max+1;
+  }
+  function clearForm(){ elMU.value=""; elAS.value=""; elComment.value=""; elMU.focus(); }
+
+  document.getElementById("btnAutono").addEventListener("click",()=>{
+    const d=elDate.value||isoToday();
+    elDate.value=d;
+    elGameNo.value=nextGameNoForDate(d);
+  });
+  document.getElementById("btnClear").addEventListener("click",()=>{
+    elDate.value=isoToday();
+    elGameNo.value="";
+    clearForm();
+  });
+  document.getElementById("btnSave").addEventListener("click",()=>{
+    const d = elDate.value||isoToday();
+    const g = normalizeGame({
+      date:d,
+      gameNo: elGameNo.value || nextGameNoForDate(d),
+      mu: elMU.value,
+      as: elAS.value,
+      comment: elComment.value
+    });
+    if (!g.date) return alert("Bitte Datum setzen.");
+    if (!Number.isFinite(g.gameNo) || g.gameNo<=0) return alert("Bitte eine gültige Spiel-Nr > 0 setzen.");
+    if (!Number.isFinite(g.mu) || !Number.isFinite(g.as)) return alert("Bitte Punkte als Zahlen eingeben.");
+    const k=keyOf(g);
+    const idx=state.games.findIndex(x=>keyOf(x)===k);
+    if (idx>=0) state.games[idx]=g; else state.games.push(g);
+    state.games.sort(byDateGameNo);
+    persist();
+    renderRecent();
+    clearForm();
+  });
+  document.getElementById("btnRefresh").addEventListener("click",renderRecent);
+
+  function renderRecent(){
+    const tbody=document.querySelector("#recentTable tbody");
+    tbody.innerHTML="";
+    const last=[...state.games].sort(byDateGameNo).slice(-12).reverse();
+    if (!last.length){
+      tbody.innerHTML = `<tr><td colspan="7" class="small">Noch keine Spiele erfasst.</td></tr>`;
+      return;
+    }
+    for (const g of last){
+      const w=winner(g.mu,g.as);
+      const pillClass = w==="MU"?"win":(w==="AS"?"lose":"");
+      const tr=document.createElement("tr");
+      tr.innerHTML = `
+        <td>${g.date}</td>
+        <td>${g.gameNo}</td>
+        <td>${fmt(g.mu)}</td>
+        <td>${fmt(g.as)}</td>
+        <td><span class="pill ${pillClass}">${w}</span></td>
+        <td>${escapeHtml(g.comment||"")}</td>
+        <td class="right">
+          <button class="secondary" data-act="edit" data-key="${keyOf(g)}">Bearbeiten</button>
+          <button class="danger" data-act="del" data-key="${keyOf(g)}">Löschen</button>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll("button").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        const act=btn.dataset.act, k=btn.dataset.key;
+        const idx=state.games.findIndex(x=>keyOf(x)===k);
+        if (idx<0) return;
+        if (act==="edit"){
+          const g=state.games[idx];
+          elDate.value=g.date; elGameNo.value=g.gameNo; elMU.value=g.mu; elAS.value=g.as; elComment.value=g.comment||"";
+          showTab("tab-entry"); elMU.focus();
+        } else if (act==="del"){
+          if (!confirm(`Eintrag ${k} wirklich löschen?`)) return;
+          state.games.splice(idx,1);
+          persist();
+          renderRecent();
+        }
+      });
+    });
+  }
+
+  // Day
+  const dayPick=document.getElementById("dayPick");
+  dayPick.addEventListener("change",renderDay);
+
+  function renderDay(){
+    const d = dayPick.value || isoToday();
+    dayPick.value = d;
+    const games = state.games.filter(g=>g.date===d).sort((a,b)=>a.gameNo-b.gameNo);
+    const tbody=document.querySelector("#dayTable tbody");
+    tbody.innerHTML="";
+    let sumMU=0,sumAS=0;
+    for (const g of games){ sumMU+=Number(g.mu||0); sumAS+=Number(g.as||0); }
+    const w=winner(sumMU,sumAS);
+    document.getElementById("kDayGames").textContent = games.length;
+    document.getElementById("kDayMU").textContent = fmt(sumMU);
+    document.getElementById("kDayAS").textContent = fmt(sumAS);
+    document.getElementById("kDayWinner").textContent = (w==="-"?"Unentschieden":w);
+
+    if (!games.length){
+      tbody.innerHTML = `<tr><td colspan="5" class="small">Keine Spiele am ${d}.</td></tr>`;
+      return;
+    }
+    for (const g of games){
+      const w2=winner(g.mu,g.as);
+      const pillClass = w2==="MU"?"win":(w2==="AS"?"lose":"");
+      const tr=document.createElement("tr");
+      tr.innerHTML = `<td>${g.gameNo}</td><td>${fmt(g.mu)}</td><td>${fmt(g.as)}</td><td><span class="pill ${pillClass}">${w2}</span></td><td>${escapeHtml(g.comment||"")}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  // Dashboard
+  function renderDashboard(){
+    const games=[...state.games].sort(byDateGameNo);
+    const total=games.length;
+    let winsMU=0,winsAS=0,draws=0,sumMU=0,sumAS=0;
+    for (const g of games){
+      const mu=Number(g.mu||0), as=Number(g.as||0);
+      sumMU+=mu; sumAS+=as;
+      const w=winner(mu,as);
+      if (w==="MU") winsMU++; else if (w==="AS") winsAS++; else draws++;
+    }
+    document.getElementById("kTotalGames").textContent=total;
+    document.getElementById("kWinsMU").textContent=winsMU;
+    document.getElementById("kWinsAS").textContent=winsAS;
+    document.getElementById("kDraws").textContent=draws;
+    document.getElementById("kAvgMU").textContent= total ? fmt(sumMU/total) : "0";
+    document.getElementById("kAvgAS").textContent= total ? fmt(sumAS/total) : "0";
+    document.getElementById("kDiff").textContent= total ? fmt((sumAS-sumMU)/total) : "0";
+    document.getElementById("kLast").textContent= total ? `${games[total-1].date} #${games[total-1].gameNo}` : "-";
+    renderMonthTable(games);
+    renderChart(games);
+  }
+
+  function renderMonthTable(games){
+    const map=new Map();
+    for (const g of games){
+      const m=String(g.date||"").slice(0,7);
+      if (!m) continue;
+      if (!map.has(m)) map.set(m,{month:m,games:0,winsMU:0,winsAS:0,sumMU:0,sumAS:0});
+      const s=map.get(m);
+      s.games++; s.sumMU+=Number(g.mu||0); s.sumAS+=Number(g.as||0);
+      const w=winner(g.mu,g.as);
+      if (w==="MU") s.winsMU++; else if (w==="AS") s.winsAS++;
+    }
+    const rows=[...map.values()].sort((a,b)=>a.month<b.month?-1:1);
+    const tbody=document.querySelector("#monthTable tbody");
+    tbody.innerHTML="";
+    if (!rows.length){
+      tbody.innerHTML = `<tr><td colspan="6" class="small">Noch keine Daten.</td></tr>`;
+      return;
+    }
+    for (const r of rows){
+      const tr=document.createElement("tr");
+      tr.innerHTML = `<td>${r.month}</td><td>${r.games}</td><td>${r.winsMU}</td><td>${r.winsAS}</td><td>${fmt(r.sumMU)}</td><td>${fmt(r.sumAS)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderChart(games){
+    const canvas=document.getElementById("chart");
+    const ctx=canvas.getContext("2d");
+    const rect=canvas.getBoundingClientRect();
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=Math.max(600, Math.floor(rect.width*dpr));
+    canvas.height=Math.floor(260*dpr);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    if (!games.length){
+      ctx.fillStyle="rgba(255,255,255,.65)";
+      ctx.font=`${14*dpr}px system-ui`;
+      ctx.fillText("Noch keine Daten - trage Spiele ein, dann erscheint hier der Punkteverlauf.", 16*dpr, 40*dpr);
+      return;
+    }
+    const padding=40*dpr, w=canvas.width, h=canvas.height;
+    const plotW=w-padding*2, plotH=h-padding*2;
+
+    const muVals=games.map(g=>Number(g.mu||0));
+    const asVals=games.map(g=>Number(g.as||0));
+    const all=muVals.concat(asVals);
+    let minV=Math.min(...all), maxV=Math.max(...all);
+    if (minV===maxV){ minV=0; maxV=maxV||1; }
+    const range=maxV-minV;
+
+    const x=i => (games.length===1 ? padding : padding+(i/(games.length-1))*plotW);
+    const y=v => padding + (1-((v-minV)/range))*plotH;
+
+    ctx.strokeStyle="rgba(255,255,255,.10)";
+    ctx.lineWidth=1*dpr;
+    const grid=4;
+    for (let i=0;i<=grid;i++){
+      const yy=padding+(i/grid)*plotH;
+      ctx.beginPath(); ctx.moveTo(padding,yy); ctx.lineTo(w-padding,yy); ctx.stroke();
+    }
+
+    ctx.fillStyle="rgba(255,255,255,.55)";
+    ctx.font=`${12*dpr}px system-ui`;
+    ctx.fillText(`min ${Math.round(minV)}`, padding, h-padding+18*dpr);
+    ctx.fillText(`max ${Math.round(maxV)}`, padding, padding-12*dpr);
+
+    drawLine(muVals, "rgba(94,234,212,.95)");
+    drawLine(asVals, "rgba(251,113,133,.95)");
+
+    ctx.fillStyle="rgba(94,234,212,.95)"; ctx.fillRect(padding, h-padding+6*dpr, 14*dpr, 3*dpr);
+    ctx.fillStyle="rgba(255,255,255,.75)"; ctx.fillText("MU", padding+22*dpr, h-padding+12*dpr);
+    ctx.fillStyle="rgba(251,113,133,.95)"; ctx.fillRect(padding+60*dpr, h-padding+6*dpr, 14*dpr, 3*dpr);
+    ctx.fillStyle="rgba(255,255,255,.75)"; ctx.fillText("AS", padding+82*dpr, h-padding+12*dpr);
+
+    function drawLine(vals, stroke){
+      ctx.strokeStyle=stroke;
+      ctx.lineWidth=2*dpr;
+      ctx.beginPath();
+      vals.forEach((v,i)=>{ const xx=x(i), yy=y(v); if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy); });
+      ctx.stroke();
+      ctx.fillStyle=stroke;
+      vals.forEach((v,i)=>{ const xx=x(i), yy=y(v); ctx.beginPath(); ctx.arc(xx,yy,3*dpr,0,Math.PI*2); ctx.fill(); });
+    }
+  }
+
+  window.addEventListener("resize",()=> {
+    if (document.getElementById("tab-dashboard").getAttribute("aria-selected")==="true") renderDashboard();
+  });
+
+  // Export/Import
+  const exportArea=document.getElementById("exportArea");
+  const importArea=document.getElementById("importArea");
+  const importMsg=document.getElementById("importMsg");
+
+  document.getElementById("btnExportJSON").addEventListener("click",()=>{
+    exportArea.value = JSON.stringify({games:[...state.games].sort(byDateGameNo)}, null, 2);
+  });
+  document.getElementById("btnExportCSV").addEventListener("click",()=>{
+    const rows=[["date","gameNo","mu","as","winner","comment"]];
+    for (const g of [...state.games].sort(byDateGameNo)){
+      rows.push([g.date,g.gameNo,g.mu,g.as,winner(g.mu,g.as),(g.comment||"").replace(/\\r?\\n/g," ")]);
+    }
+    exportArea.value = rows.map(r=>r.map(csvEscape).join(";")).join("\\n");
+  });
+  function csvEscape(v){
+    const s=String(v ?? "");
+    return (/[;"\\n]/.test(s)) ? `"${s.replace(/"/g,'""')}"` : s;
+  }
+  function setImportMsg(text, warn=true){
+    importMsg.style.display="block";
+    importMsg.textContent=text;
+    importMsg.classList.toggle("warn", warn);
+  }
+  function clearImportMsg(){ importMsg.style.display="none"; importMsg.textContent=""; }
+
+  document.getElementById("btnImport").addEventListener("click",()=>doImport(false));
+  document.getElementById("btnMerge").addEventListener("click",()=>doImport(true));
+
+  function doImport(merge){
+    clearImportMsg();
+    let parsed;
+    try { parsed = JSON.parse(importArea.value); }
+    catch(e){ setImportMsg("Import fehlgeschlagen: JSON ist ungültig.", true); return; }
+
+    const gamesIn = Array.isArray(parsed.games) ? parsed.games.map(normalizeGame) : [];
+    if (!gamesIn.length){ setImportMsg("Import: Keine Spiele in JSON gefunden (erwarte { games: [...] }).", true); return; }
+
+    if (!merge){
+      state.games = gamesIn.sort(byDateGameNo);
+      persist();
+      setImportMsg(`Import OK: ${gamesIn.length} Spiele übernommen (ersetzen).`, false);
+    } else {
+      const map = new Map(state.games.map(g=>[keyOf(g), normalizeGame(g)]));
+      for (const g of gamesIn) map.set(keyOf(g), g);
+      state.games = [...map.values()].sort(byDateGameNo);
+      persist();
+      setImportMsg(`Merge OK: Bestand aktualisiert. Jetzt ${state.games.length} Spiele.`, false);
+    }
+    renderRecent();
+    renderDay();
+    renderDashboard();
+  }
+
+  document.getElementById("btnReset").addEventListener("click",()=>{
+    if (!confirm("Wirklich ALLE Daten löschen?")) return;
+    state.games=[];
+    if (state.storageOk) localStorage.removeItem(STORAGE_KEY);
+    exportArea.value=""; importArea.value='{"games":[]}';
+    clearImportMsg();
+    renderRecent(); renderDay(); renderDashboard();
+  });
+
+  // Init
+  load();
+  elDate.value = isoToday();
+  document.getElementById("dayPick").value = isoToday();
+  renderRecent(); renderDay();
+})();
+</script>
+</body>
+</html>
